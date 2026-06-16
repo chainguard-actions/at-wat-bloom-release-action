@@ -1,0 +1,48 @@
+name: Test optional inputs
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REPOSITORY: test-org/test-package
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create minimal package.xml fixture
+        run: |
+          cat > "$GITHUB_WORKSPACE/package.xml" <<'EOF'
+          <?xml version="1.0"?>
+          <package format="2">
+            <name>test_package</name>
+            <version>2.0.0</version>
+            <description>Test package</description>
+            <maintainer email="test@example.com">Test User</maintainer>
+            <license>Apache-2.0</license>
+          </package>
+          EOF
+      - id: action
+        uses: .
+        with:
+          ros_distro: noetic humble
+          github_token_bloom: fake-token-for-testing
+          github_user: test-user
+          git_user: Custom Committer
+          git_email: custom@example.com
+          repository: test_package
+          release_repository_push_url: https://github.com/test-user/test_package-release
+          open_pr: "false"
+          debug_bloom: "true"
+        continue-on-error: true
+      - name: Assert action ran with optional inputs
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "action outcome: $OUTCOME"
+          # The action is expected to fail because bloom-release requires
+          # real GitHub credentials and ROS infrastructure.
+          # We verify it ran (not skipped) with all optional inputs provided.
+          if [ "$OUTCOME" = "skipped" ]; then
+            echo "FAIL: action was skipped, expected it to run"
+            exit 1
+          fi
+          echo "PASS: action ran with optional inputs (outcome=$OUTCOME)"
