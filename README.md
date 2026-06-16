@@ -8,6 +8,7 @@ Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at
 
 | Version | Tag | Upstream commit |
 |---------|-----|-----------------|
+| v0.0.10 | [`v0.0.10`](https://github.com/chainguard-actions/at-wat-bloom-release-action/tree/v0.0.10) | [`61bb790`](https://github.com/at-wat/bloom-release-action/commit/61bb790d55913b1bca0cc9fb040a191054659384) |
 | v0.0.12 | [`v0.0.12`](https://github.com/chainguard-actions/at-wat-bloom-release-action/tree/v0.0.12) | [`a4165e7`](https://github.com/at-wat/bloom-release-action/commit/a4165e7fa5260d1c8a00986c8b3dd1c4dd92fe77) |
 
 ## Privacy
