@@ -1,1 +1,15 @@
-# at-wat-bloom-release-action
+# at-wat/bloom-release-action
+
+Bloom release the ROS package
+
+Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at [https://github.com/at-wat/bloom-release-action](https://github.com/at-wat/bloom-release-action).
+
+## Versions
+
+| Version | Tag | Upstream commit |
+|---------|-----|-----------------|
+| v0.0.12 | [`v0.0.12`](https://github.com/chainguard-actions/at-wat-bloom-release-action/tree/v0.0.12) | [`a4165e7`](https://github.com/at-wat/bloom-release-action/commit/a4165e7fa5260d1c8a00986c8b3dd1c4dd92fe77) |
+
+## Privacy
+
+This Action contacts Chainguard's licensing server to verify authorization. Connection metadata (IP address, GitHub repository identifier, timestamp, and any metadata encoded in the auth token) is transmitted to Chainguard, Inc. even if authorization is denied in accordance with our [Privacy Notice](https://www.chainguard.dev/legal/privacy-notice)
