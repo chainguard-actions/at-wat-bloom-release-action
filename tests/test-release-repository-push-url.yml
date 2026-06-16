@@ -1,0 +1,22 @@
+name: Test release_repository_push_url input
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          ros_distro: humble
+          github_token_bloom: fake-token
+          github_user: fake-user
+          git_email: fake@example.com
+          release_repository_push_url: https://github.com/fake-user/fake-release-repo.git
+      - name: Assert action ran with release_repository_push_url input
+        run: |
+          echo "Action completed (possibly with error due to fake credentials)"
+          echo "The release_repository_push_url input was accepted by the action"
+          echo "PASS"

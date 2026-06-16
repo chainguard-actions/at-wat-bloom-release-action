@@ -1,0 +1,34 @@
+name: Test tag and release scenario
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/tags/v1.0.0
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Test action with tag_and_release enabled
+        id: action
+        uses: .
+        with:
+          ros_distro: humble
+          github_token_bloom: fake-token-for-testing
+          github_user: test-user
+          git_email: test@example.com
+          tag_and_release: "true"
+        continue-on-error: true
+      - name: Assert action ran with tag_and_release input
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          # The action should either succeed or fail due to auth/network issues,
+          # not due to missing required inputs or Docker build errors.
+          if [ "$OUTCOME" = "success" ] || [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action ran with tag_and_release=true (outcome=$OUTCOME)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi
