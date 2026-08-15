@@ -1,0 +1,61 @@
+name: Test tag_and_release creates new tag and sets version output
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Copy package.xml fixture to workspace root
+        run: |
+          cp "$GITHUB_WORKSPACE/tests/fixtures/package.xml" "$GITHUB_WORKSPACE/package.xml"
+
+      - name: Set up git origin reachable inside the Docker container (no tag)
+        run: |
+          git config user.email "test@example.com"
+          git config user.name "Test User"
+          # Create a bare repo under GITHUB_WORKSPACE WITHOUT the 1.2.3 tag
+          # so the action will create it
+          rm -rf "$GITHUB_WORKSPACE/.git-remote"
+          git init --bare "$GITHUB_WORKSPACE/.git-remote"
+          git push "$GITHUB_WORKSPACE/.git-remote" HEAD:refs/heads/act-harness
+          # Do NOT push tags — the 1.2.3 tag should not exist in origin
+          # Repoint origin to the bare repo (reachable at /github/workspace/.git-remote inside Docker)
+          git remote set-url origin "$GITHUB_WORKSPACE/.git-remote" 2>/dev/null || \
+            git remote add origin "$GITHUB_WORKSPACE/.git-remote"
+
+      - id: action
+        uses: .
+        with:
+          ros_distro: "noetic"
+          github_token_bloom: "fake-bloom-token"
+          github_user: "test-user"
+          git_email: "test@example.com"
+          repository: "test_package"
+          tag_and_release: "true"
+          open_pr: "false"
+          debug_bloom: "false"
+
+      - name: Assert version output is set to 1.2.3
+        env:
+          ACTUAL: ${{ steps.action.outputs.version }}
+        run: |
+          echo "actual version output: '$ACTUAL'"
+          if [ "$ACTUAL" != "1.2.3" ]; then
+            echo "FAIL: expected version output '1.2.3', got: '$ACTUAL'"
+            exit 1
+          fi
+          echo "PASS: version output is '1.2.3' as expected"
+
+      - name: Assert tag was pushed to origin
+        run: |
+          # Verify the tag was pushed to the bare repo
+          if git ls-remote "$GITHUB_WORKSPACE/.git-remote" refs/tags/1.2.3 | grep -q "1.2.3"; then
+            echo "PASS: tag 1.2.3 was pushed to origin"
+          else
+            echo "FAIL: tag 1.2.3 was not found in origin"
+            exit 1
+          fi

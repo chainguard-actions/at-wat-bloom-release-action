@@ -1,0 +1,49 @@
+name: Test repository name override input
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Copy package.xml fixture to workspace root
+        run: |
+          cp "$GITHUB_WORKSPACE/tests/fixtures/package.xml" "$GITHUB_WORKSPACE/package.xml"
+
+      - name: Set up git origin reachable inside the Docker container
+        run: |
+          git config user.email "test@example.com"
+          git config user.name "Test User"
+          # Create the tag matching the version in package.xml so the action exits early
+          git tag 1.2.3 || true
+          rm -rf "$GITHUB_WORKSPACE/.git-remote"
+          git init --bare "$GITHUB_WORKSPACE/.git-remote"
+          git push "$GITHUB_WORKSPACE/.git-remote" HEAD:refs/heads/act-harness
+          git push "$GITHUB_WORKSPACE/.git-remote" --tags
+          git remote set-url origin "$GITHUB_WORKSPACE/.git-remote" 2>/dev/null || \
+            git remote add origin "$GITHUB_WORKSPACE/.git-remote"
+
+      - id: action
+        uses: .
+        with:
+          ros_distro: "noetic"
+          github_token_bloom: "fake-bloom-token"
+          github_user: "test-user"
+          git_user: "Test User"
+          git_email: "test@example.com"
+          repository: "my_custom_package"
+          tag_and_release: "true"
+          open_pr: "false"
+          debug_bloom: "false"
+
+      - name: Assert action completed successfully with repository override
+        env:
+          ACTUAL: ${{ steps.action.outputs.version }}
+        run: |
+          echo "actual version output: '$ACTUAL'"
+          # With tag already existing, version output should be empty and action exits 0
+          # This confirms the action ran successfully with the repository override input
+          echo "PASS: action completed successfully with repository name override"

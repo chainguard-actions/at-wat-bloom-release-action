@@ -1,0 +1,53 @@
+name: Test tag_and_release when tag already exists
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Copy package.xml fixture to workspace root
+        run: |
+          cp "$GITHUB_WORKSPACE/tests/fixtures/package.xml" "$GITHUB_WORKSPACE/package.xml"
+
+      - name: Set up git origin reachable inside the Docker container
+        run: |
+          git config user.email "test@example.com"
+          git config user.name "Test User"
+          # Create the tag that matches the version in package.xml (1.2.3)
+          git tag 1.2.3 || true
+          # Create a bare repo under GITHUB_WORKSPACE so it's reachable inside the container
+          rm -rf "$GITHUB_WORKSPACE/.git-remote"
+          git init --bare "$GITHUB_WORKSPACE/.git-remote"
+          git push "$GITHUB_WORKSPACE/.git-remote" HEAD:refs/heads/act-harness
+          git push "$GITHUB_WORKSPACE/.git-remote" --tags
+          # Repoint origin to the bare repo (reachable at /github/workspace/.git-remote inside Docker)
+          git remote set-url origin "$GITHUB_WORKSPACE/.git-remote" 2>/dev/null || \
+            git remote add origin "$GITHUB_WORKSPACE/.git-remote"
+
+      - id: action
+        uses: .
+        with:
+          ros_distro: "noetic"
+          github_token_bloom: "fake-bloom-token"
+          github_user: "test-user"
+          git_email: "test@example.com"
+          repository: "test_package"
+          tag_and_release: "true"
+          open_pr: "false"
+          debug_bloom: "false"
+
+      - name: Assert version output is empty (tag already existed)
+        env:
+          ACTUAL: ${{ steps.action.outputs.version }}
+        run: |
+          echo "actual version output: '$ACTUAL'"
+          # When the tag already exists, the action exits 0 without setting version output
+          if [ -n "$ACTUAL" ]; then
+            echo "FAIL: expected empty version output when tag already exists, got: $ACTUAL"
+            exit 1
+          fi
+          echo "PASS: version output is empty as expected when tag already exists"
