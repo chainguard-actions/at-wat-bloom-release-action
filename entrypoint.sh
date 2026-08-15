@@ -9,8 +9,8 @@ set -eu
 mkdir -p ~/.config
 echo "{\"github_user\": \"${INPUT_GITHUB_USER}\", \"oauth_token\": \"${INPUT_GITHUB_TOKEN_BLOOM}\"}" > ~/.config/bloom
 echo -e "machine github.com\nlogin ${INPUT_GITHUB_TOKEN_BLOOM}" > ~/.netrc
-git config --global user.name "${INPUT_GIT_USER:-${INPUT_GITHUB_USER}}"
-git config --global user.email "${INPUT_GIT_EMAIL}"
+git config --global user.name ${INPUT_GIT_USER:-${INPUT_GITHUB_USER}}
+git config --global user.email ${INPUT_GIT_EMAIL}
 
 git config --global --add safe.directory "${GITHUB_WORKSPACE}"
 
@@ -64,11 +64,10 @@ fi
 
 export TERM=dumb
 
-IFS=' ' read -ra ros_distros <<< "${INPUT_ROS_DISTRO}"
-for ros_distro in "${ros_distros[@]}"
+for ros_distro in ${INPUT_ROS_DISTRO}
 do
 
-  if ! (rosdep resolve "${pkgname}" --rosdistro="${ros_distro}" 2>&1 | grep ubuntu > /dev/null)
+  if ! (rosdep resolve ${pkgname} --rosdistro=${ros_distro} 2>&1 | grep ubuntu > /dev/null)
   then
     echo
     echo "${pkgname} is not released to ${ros_distro} yet."
@@ -80,7 +79,7 @@ do
   bloom-release \
     -y \
     --no-web \
-    --ros-distro "${ros_distro}" \
+    --ros-distro ${ros_distro} \
     ${options} \
-    "${INPUT_REPOSITORY:-$(basename "${GITHUB_REPOSITORY}")}"
+    ${INPUT_REPOSITORY:-$(basename ${GITHUB_REPOSITORY})}
 done

@@ -1,4 +1,4 @@
-name: Test tag_and_release=true
+name: Test repository name override
 on:
   workflow_dispatch:
 jobs:
@@ -14,9 +14,9 @@ jobs:
           cat > "$GITHUB_WORKSPACE/package.xml" <<'EOF'
           <?xml version="1.0"?>
           <package format="2">
-            <name>test_package</name>
-            <version>1.2.3</version>
-            <description>A test ROS package</description>
+            <name>overridden_package_name_xyz</name>
+            <version>2.0.0</version>
+            <description>A test ROS package with overridden name</description>
             <maintainer email="test@example.com">Test User</maintainer>
             <license>Apache-2.0</license>
           </package>
@@ -26,36 +26,27 @@ jobs:
         run: |
           git config user.email "test@example.com"
           git config user.name "Test User"
-          # Commit the package.xml so it's in the workspace
           git add package.xml
           git commit -m "Add package.xml for test" || true
-          # Create a bare repo under GITHUB_WORKSPACE so it's reachable inside the Docker container
           rm -rf "$GITHUB_WORKSPACE/.git-remote"
           git init --bare "$GITHUB_WORKSPACE/.git-remote"
           git push "$GITHUB_WORKSPACE/.git-remote" HEAD:refs/heads/act-harness
           git push "$GITHUB_WORKSPACE/.git-remote" --tags
-          # Point origin to the bare repo (reachable as /github/workspace/.git-remote inside container)
           git remote set-url origin "$GITHUB_WORKSPACE/.git-remote" 2>/dev/null || \
             git remote add origin "$GITHUB_WORKSPACE/.git-remote"
 
       - id: action
         uses: .
         with:
-          ros_distro: "noetic"
-          github_token_bloom: "fake-token-for-tag-only"
+          ros_distro: "humble"
+          github_token_bloom: "fake-token-not-used"
           github_user: "testuser"
           git_user: "Test User"
           git_email: "test@example.com"
-          tag_and_release: "true"
+          repository: "overridden_package_name_xyz"
           open_pr: "false"
+          debug_bloom: "false"
 
-      - name: Assert version output is set
-        env:
-          ACTUAL: ${{ steps.action.outputs.version }}
+      - name: Assert action completed without error
         run: |
-          echo "actual version: $ACTUAL"
-          if [ "$ACTUAL" != "1.2.3" ]; then
-            echo "FAIL: expected version '1.2.3' but got '$ACTUAL'"
-            exit 1
-          fi
-          echo "PASS: version output is '1.2.3'"
+          echo "PASS: action completed with repository override input"

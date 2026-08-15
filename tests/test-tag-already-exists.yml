@@ -1,4 +1,4 @@
-name: Test tag_and_release=true
+name: Test tag_and_release when tag already exists
 on:
   workflow_dispatch:
 jobs:
@@ -14,27 +14,26 @@ jobs:
           cat > "$GITHUB_WORKSPACE/package.xml" <<'EOF'
           <?xml version="1.0"?>
           <package format="2">
-            <name>test_package</name>
-            <version>1.2.3</version>
-            <description>A test ROS package</description>
+            <name>existing_tag_package</name>
+            <version>3.0.0</version>
+            <description>A test ROS package whose tag already exists</description>
             <maintainer email="test@example.com">Test User</maintainer>
             <license>Apache-2.0</license>
           </package>
           EOF
 
-      - name: Set up git config and reachable origin inside Docker container
+      - name: Set up git config and reachable origin with pre-existing tag
         run: |
           git config user.email "test@example.com"
           git config user.name "Test User"
-          # Commit the package.xml so it's in the workspace
           git add package.xml
           git commit -m "Add package.xml for test" || true
-          # Create a bare repo under GITHUB_WORKSPACE so it's reachable inside the Docker container
+          # Create the tag locally so it gets pushed to the bare remote
+          git tag 3.0.0 || true
           rm -rf "$GITHUB_WORKSPACE/.git-remote"
           git init --bare "$GITHUB_WORKSPACE/.git-remote"
           git push "$GITHUB_WORKSPACE/.git-remote" HEAD:refs/heads/act-harness
           git push "$GITHUB_WORKSPACE/.git-remote" --tags
-          # Point origin to the bare repo (reachable as /github/workspace/.git-remote inside container)
           git remote set-url origin "$GITHUB_WORKSPACE/.git-remote" 2>/dev/null || \
             git remote add origin "$GITHUB_WORKSPACE/.git-remote"
 
@@ -49,13 +48,13 @@ jobs:
           tag_and_release: "true"
           open_pr: "false"
 
-      - name: Assert version output is set
+      - name: Assert version output is empty when tag already exists
         env:
           ACTUAL: ${{ steps.action.outputs.version }}
         run: |
-          echo "actual version: $ACTUAL"
-          if [ "$ACTUAL" != "1.2.3" ]; then
-            echo "FAIL: expected version '1.2.3' but got '$ACTUAL'"
+          echo "actual version: '$ACTUAL'"
+          if [ -n "$ACTUAL" ]; then
+            echo "FAIL: expected empty version output when tag already exists, but got '$ACTUAL'"
             exit 1
           fi
-          echo "PASS: version output is '1.2.3'"
+          echo "PASS: version output is empty as expected (tag already existed)"

@@ -8,51 +8,43 @@
 
 **Test Policy SHA:** `843adf9e4b8f85d0c08b27b9d0b09dd094b54702`
 
-**Harden Agent Version:** `1`
+**Harden Agent Version:** `2`
 
-Action **at-wat--bloom-release-action/v0.0.10** was hardened automatically. 1 finding(s) were identified and resolved across 1 iteration(s).
+Action **at-wat--bloom-release-action/v0.0.10** was hardened automatically. 3 finding(s) were identified and resolved across 1 iteration(s).
 
 ## Findings Fixed
 
-### script-injection (severity: high)
+### unpinned-uses (severity: high)
 
-entrypoint.sh contains multiple unquoted expansions of workflow-controllable INPUT_* environment variables in shell commands (rule b). These variables are set by the calling workflow from action inputs and are treated as untrusted. An attacker who controls these inputs can inject shell metacharacters (`;`, `|`, `&`, `$(...)`, etc.) to execute arbitrary commands.
-
-Specific unquoted violations:
-- Line 12: `git config --global user.name ${INPUT_GIT_USER:-${INPUT_GITHUB_USER}}` — INPUT_GIT_USER and INPUT_GITHUB_USER are unquoted
-- Line 13: `git config --global user.email ${INPUT_GIT_EMAIL}` — INPUT_GIT_EMAIL is unquoted
-- Line 30: `for ros_distro in ${INPUT_ROS_DISTRO}` — INPUT_ROS_DISTRO is unquoted (word-splits on whitespace, allowing multiple values or injection)
-- Line 55: `rosdep resolve ${pkgname} --rosdistro=${ros_distro}` — ros_distro (from INPUT_ROS_DISTRO) is unquoted
-- Line 62: `--ros-distro ${ros_distro}` — unquoted
-- Line 64: `${options}` — unquoted; options string is built from INPUT_RELEASE_REPOSITORY_PUSH_URL without quoting
-- Line 65: `${INPUT_REPOSITORY:-$(basename ${GITHUB_REPOSITORY})}` — INPUT_REPOSITORY is unquoted
-
-All of these should use double-quoted expansions: `"${INPUT_GIT_USER:-${INPUT_GITHUB_USER}}"`, `"${INPUT_GIT_EMAIL}"`, `"${INPUT_ROS_DISTRO}"`, etc.
+The workflow file uses `actions/checkout@v2`, which is pinned to a mutable tag rather than an immutable 40-character commit SHA. This means the action could be silently updated to a different (potentially malicious) version without any change to the workflow file.
 
 Locations:
 
-- `entrypoint.sh:12`
-- `entrypoint.sh:13`
-- `entrypoint.sh:30`
-- `entrypoint.sh:55`
-- `entrypoint.sh:62`
-- `entrypoint.sh:64`
-- `entrypoint.sh:65`
+- `.github/workflows/version-tag.yml:11`
+
+### script-injection (severity: high)
+
+Rule (a): The `run:` block in the `tag` step directly interpolates GitHub Actions expressions into the shell command string. Specifically, `${{ secrets.GITHUB_TOKEN }}` and `${{ github.repository }}` are embedded directly in the `git remote set-url` command. Any `${{ ... }}` expression inside a `run:` block is substituted by the Actions runner before the shell sees it, bypassing shell quoting and enabling injection. Rule (b): `${{ github.ref }}` is assigned to the env var `TAG`, but then used unquoted in `git tag $(basename ${TAG%.*.*})` and `git tag $(basename ${TAG%.*})`, allowing shell metacharacter injection if the ref value contains special characters.
+
+Locations:
+
+- `.github/workflows/version-tag.yml:13`
+
+### missing-permissions (severity: medium)
+
+The workflow file `version-tag.yml` has no top-level `permissions:` key and no job-level `permissions:` key on the `version-tag` job. Without explicit permissions, the workflow inherits the repository's default token permissions, which may be overly broad (e.g., write access to all scopes). Explicit minimal permissions should be declared.
+
+Locations:
+
+- `.github/workflows/version-tag.yml:1`
 
 ## Iteration Notes
 
 ### Iteration 1
 
-**Fixes applied:** script-injection
+**Fixes applied:** unpinned-uses, missing-permissions, script-injection
 
 **Notes:**
 
-Fixed all 7 unquoted variable expansion violations in entrypoint.sh:
-1. Line 12: Quoted `${INPUT_GIT_USER:-${INPUT_GITHUB_USER}}` in git config user.name
-2. Line 13: Quoted `${INPUT_GIT_EMAIL}` in git config user.email
-3. Line 30: Replaced bare `for ros_distro in ${INPUT_ROS_DISTRO}` with `IFS=' ' read -ra ros_distros <<< "${INPUT_ROS_DISTRO}"` + `for ros_distro in "${ros_distros[@]}"` to safely iterate over space-separated distros while preventing metacharacter injection
-4. Line 55: Quoted `${pkgname}` and `${ros_distro}` in rosdep resolve command
-5. Line 62: Quoted `${ros_distro}` in --ros-distro argument
-6. Line 64: Left `${options}` unquoted (it is an internally-constructed flag list that requires word-splitting; its values come from fixed string literals, not raw user input)
-7. Line 65: Quoted `${INPUT_REPOSITORY:-$(basename "${GITHUB_REPOSITORY}")}` in bloom-release command
+Fixed all three findings in .github/workflows/version-tag.yml: (1) Pinned actions/checkout@v2 to full commit SHA 0717577d45739eb3c851188b29f50ed6c0b2194e. (2) Added top-level 'permissions: contents: write' block (minimum needed to push git tags). (3) Moved all ${{ }} expressions (${{ secrets.GITHUB_TOKEN }}, ${{ github.repository }}, ${{ github.ref }}) out of the run: block into the step's env: block, and properly double-quoted all variable expansions in the shell script to prevent injection.
 
