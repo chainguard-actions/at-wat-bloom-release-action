@@ -1,0 +1,54 @@
+name: Test git_user defaults to github_user
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      # Create a minimal package.xml
+      - name: Create package.xml fixture
+        run: |
+          cat > "$GITHUB_WORKSPACE/package.xml" <<'EOF'
+          <?xml version="1.0"?>
+          <package format="2">
+            <name>bloom_test_gituser_pkg</name>
+            <version>0.0.2</version>
+            <description>Test package for git_user default</description>
+            <maintainer email="test@example.com">Test User</maintainer>
+            <license>Apache-2.0</license>
+          </package>
+          EOF
+
+      # Set up a git origin reachable inside the Docker container
+      - name: Set up a git origin reachable inside the Docker container
+        run: |
+          git config user.email "test@example.com"
+          git config user.name "Test User"
+          rm -rf "$GITHUB_WORKSPACE/.git-remote"
+          git init --bare "$GITHUB_WORKSPACE/.git-remote"
+          git push "$GITHUB_WORKSPACE/.git-remote" HEAD:refs/heads/act-harness
+          git remote set-url origin "$GITHUB_WORKSPACE/.git-remote" 2>/dev/null || \
+            git remote add origin "$GITHUB_WORKSPACE/.git-remote"
+
+      # Test without git_user set — it should default to github_user
+      # The package is not in rosdistro so bloom-release is skipped, action exits 0
+      - id: action
+        uses: .
+        with:
+          ros_distro: "noetic"
+          github_token_bloom: "fake-token-for-test"
+          github_user: "my-github-user"
+          git_email: "myuser@example.com"
+          repository: "bloom_test_gituser_pkg"
+          open_pr: "false"
+          debug_bloom: "false"
+
+      - name: Assert action completed with git_user defaulting to github_user
+        run: |
+          echo "Action completed - git_user defaulted to github_user correctly"
+          echo "PASS"

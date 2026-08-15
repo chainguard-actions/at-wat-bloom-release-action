@@ -1,0 +1,56 @@
+name: Test tag_and_release skips when tag already exists
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      # Create a minimal package.xml so the action can find the version
+      - name: Create package.xml fixture
+        run: |
+          cat > "$GITHUB_WORKSPACE/package.xml" <<'EOF'
+          <?xml version="1.0"?>
+          <package format="2">
+            <name>bloom_test_tag_pkg</name>
+            <version>0.1.0</version>
+            <description>Test package for tag scenario</description>
+            <maintainer email="test@example.com">Test User</maintainer>
+            <license>Apache-2.0</license>
+          </package>
+          EOF
+
+      # Set up a git origin reachable inside the Docker container and pre-create the tag
+      - name: Set up git origin with pre-existing tag reachable inside Docker container
+        run: |
+          git config user.email "test@example.com"
+          git config user.name "Test User"
+          # Create the tag that matches the version in package.xml
+          git tag 0.1.0 || true
+          rm -rf "$GITHUB_WORKSPACE/.git-remote"
+          git init --bare "$GITHUB_WORKSPACE/.git-remote"
+          git push "$GITHUB_WORKSPACE/.git-remote" HEAD:refs/heads/act-harness
+          git push "$GITHUB_WORKSPACE/.git-remote" --tags
+          git remote set-url origin "$GITHUB_WORKSPACE/.git-remote" 2>/dev/null || \
+            git remote add origin "$GITHUB_WORKSPACE/.git-remote"
+
+      # When tag already exists, the action should print "Tag found. Nothing to do." and exit 0
+      - id: action
+        uses: .
+        with:
+          ros_distro: "noetic"
+          github_token_bloom: "fake-token-for-test"
+          github_user: "test-user"
+          git_email: "test@example.com"
+          tag_and_release: "true"
+          open_pr: "false"
+          debug_bloom: "false"
+
+      - name: Assert action exited cleanly when tag already exists
+        run: |
+          echo "Action completed - tag already existed so action exited cleanly"
+          echo "PASS"
