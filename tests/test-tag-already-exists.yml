@@ -1,4 +1,4 @@
-name: Test tag_and_release creates tag from package.xml
+name: Test tag_and_release exits cleanly when tag already exists
 on:
   workflow_dispatch:
 jobs:
@@ -15,24 +15,27 @@ jobs:
           <?xml version="1.0"?>
           <package format="2">
             <name>test_pkg</name>
-            <version>1.2.3</version>
+            <version>2.0.0</version>
             <description>Test package</description>
             <maintainer email="test@example.com">Test</maintainer>
             <license>Apache-2.0</license>
           </package>
           EOF
 
-      - name: Set up git config and a bare remote reachable inside the Docker container
+      - name: Set up git config, pre-existing tag, and bare remote inside workspace
         run: |
           git config user.email "test@example.com"
           git config user.name "Test User"
-          # Commit the package.xml so it's in the workspace
+          # Commit the package.xml
           git add package.xml
           git commit -m "Add package.xml for test" || true
+          # Create the tag locally so it already exists
+          git tag 2.0.0 || true
           # Create a bare repo under GITHUB_WORKSPACE so it's visible inside the container
           rm -rf "$GITHUB_WORKSPACE/.git-remote"
           git init --bare "$GITHUB_WORKSPACE/.git-remote"
           git push "$GITHUB_WORKSPACE/.git-remote" HEAD:refs/heads/act-harness
+          # Push the pre-existing tag to the remote
           git push "$GITHUB_WORKSPACE/.git-remote" --tags
           # Point origin at the in-workspace bare repo
           git remote set-url origin "$GITHUB_WORKSPACE/.git-remote" 2>/dev/null || \
@@ -50,23 +53,13 @@ jobs:
           open_pr: "false"
           debug_bloom: "false"
 
-      - name: Assert version output is set
+      - name: Assert version output is empty (tag already existed, action exited early)
         env:
           ACTUAL: ${{ steps.action.outputs.version }}
         run: |
-          echo "actual version: $ACTUAL"
-          if [ "$ACTUAL" != "1.2.3" ]; then
-            echo "FAIL: expected version '1.2.3' but got '$ACTUAL'"
+          echo "actual version: '$ACTUAL'"
+          if [ -n "$ACTUAL" ]; then
+            echo "FAIL: expected empty version output when tag already exists, got '$ACTUAL'"
             exit 1
           fi
-          echo "PASS: version output is correct"
-
-      - name: Assert tag was created in the remote
-        run: |
-          TAG=$(git -C "$GITHUB_WORKSPACE/.git-remote" tag -l "1.2.3")
-          echo "tag found: $TAG"
-          if [ "$TAG" != "1.2.3" ]; then
-            echo "FAIL: expected tag '1.2.3' to be pushed to remote"
-            exit 1
-          fi
-          echo "PASS: tag 1.2.3 exists in remote"
+          echo "PASS: version output is empty as expected (tag already existed)"
